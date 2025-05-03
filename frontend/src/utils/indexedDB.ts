@@ -48,12 +48,12 @@ export const openDB = async (): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
         const indDB: IDBFactory = 
                         window.indexedDB 
-                        // ||
-                        // (window as any).mozIndexedDB 
-                        // || // Use type assertion for non-standard props
-                        // (window as any).webkitIndexedDB || 
-                        // (window as any).msIndexedDB ||
-                        // (window as any).shimIndexedDB; // Fallback for polyfills
+                        ||
+                        (window as any).mozIndexedDB 
+                        || // Use type assertion for non-standard props
+                        (window as any).webkitIndexedDB || 
+                        (window as any).msIndexedDB ||
+                        (window as any).shimIndexedDB; // Fallback for polyfills
         if (!indDB) {
             console.error("Your browser doesn't support IndexedDB.");
             return;

@@ -2,6 +2,9 @@ import crypto from "crypto";
 import fs from "fs";
 import ffmpeg from "fluent-ffmpeg";
 import path from "path";
+import { Response } from "express";
+import * as stream from 'stream';
+import { promisify } from 'util';
 
 const algorithm = "aes-256-cbc"; // Encryption algorithm
 const iv = crypto.randomBytes(16); // Initialization vector
@@ -98,3 +101,69 @@ const reEncodeVideo = (inputPath: string, outputPath: string): Promise<void> => 
             .run();
     });
 };
+
+const pipeline = promisify(stream.pipeline);
+
+// Updated function that works with your existing serveVideo approach
+export const decryptReEncodeAndStream = async (
+    filePath: string,
+    start: number,
+    end: number,
+    res: Response,
+    encryptionKey: string
+): Promise<void> => {
+    try {
+        const iv = Buffer.alloc(16); // Initialization Vector
+        const bufferStream = new stream.PassThrough();
+        
+        // Set up FFmpeg with buffer stream as input
+        const ffmpegProcess = ffmpeg(bufferStream)
+            .inputFormat('mp4') // Adjust based on your actual content format
+            .outputOptions([
+                '-movflags faststart',
+                '-preset ultrafast',
+                '-tune zerolatency',
+                // Skip to the approximate position in the video that corresponds to the byte range
+                // Note: This is an approximation as byte ranges don't directly map to video time
+                '-ss 0', // You may need a more sophisticated mapping between byte range and video time
+            ])
+            .videoCodec('libx264')
+            .audioCodec('aac')
+            .format('mp4')
+            .on('start', (command) => console.log(`FFmpeg command: ${command}`))
+            .on('error', (err) => {
+                console.error('FFmpeg error:', err);
+                if (!res.headersSent) {
+                    res.status(500).end('Error processing video.');
+                }
+            });
+
+        // Pipe FFmpeg output to response
+        ffmpegProcess.pipe(res, { end: true });
+        
+        // Create readable stream for the chunk
+        const readStream = fs.createReadStream(filePath, { start, end });
+        const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(encryptionKey, 'hex'), iv);
+        
+        // Process the stream
+        await pipeline(
+            readStream,
+            decipher,
+            bufferStream
+        );
+        
+        // End the buffer stream when all data has been processed
+        bufferStream.end();
+        
+    } catch (error) {
+        console.error('Error decrypting and streaming video:', error);
+        if (!res.headersSent) {
+            res.status(500).end('Error processing video.');
+        }
+    }
+};
+
+
+
+
+

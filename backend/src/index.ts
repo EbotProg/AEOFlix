@@ -3,6 +3,7 @@ import videoRoutes from './routes/videoRoutes';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
 import cors from 'cors';
+import path from 'path';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(cors({
   credentials: true // Enable credentials if needed
 }));
 app.use(express.json());
+app.use('/thumbnails', express.static(path.join(__dirname, '../uploads/thumbnails')));
 app.use('/api/videos', videoRoutes);
 
 app.get("/", (req: Request, res: Response) => {
